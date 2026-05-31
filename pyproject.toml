@@ -1,0 +1,9 @@
+[project]
+name = "video-knowledge-rag"
+version = "0.1.0"
+description = "A lightweight local RAG/Agent demo for documentary subtitle retrieval with knowledge expansion."
+requires-python = ">=3.9"
+dependencies = []
+
+[tool.setuptools]
+packages = ["rag_search"]

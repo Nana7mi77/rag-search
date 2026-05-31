@@ -1,0 +1,35 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+.env
+
+# Local corpora and generated indexes
+data/local_*.csv
+data/index.json
+data/*.bin
+data/*.dat
+data/*.hnsw
+data/vector_cache*.json
+data/vector_progress.json
+
+# Rebuild / test temp files
+_*.py
+_*.txt
+_*.ps1
+_*.vbs
+_rebuild_*
+rebuild_loop.ps1
+run_rebuild.vbs
+
+# Docker service state
+services/**/data/
+services/**/logs/
+services/**/plugins/
+
+# Experiment caches
+experiments/**/cache/
+
+# Notebook/runtime noise
+.ipynb_checkpoints/
+.pytest_cache/

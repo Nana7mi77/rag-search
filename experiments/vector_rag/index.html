@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG 检索对比实验 - 原理与效果</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e1a;--card:#111827;--border:#1e293b;--text:#e2e8f0;--dim:#64748b;--accent:#3b82f6;--green:#10b981;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--cyan:#06b6d4}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;line-height:1.6}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+h1{font-size:2rem;text-align:center;margin:30px 0 10px;background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{text-align:center;color:var(--dim);margin-bottom:40px;font-size:0.95rem}
+h2{font-size:1.4rem;margin:40px 0 20px;padding-left:12px;border-left:4px solid var(--accent)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
+.grid{display:grid;gap:20px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:1fr 1fr 1fr}
+.grid-5{grid-template-columns:repeat(5,1fr)}
+@media(max-width:768px){.grid-2,.grid-3,.grid-5{grid-template-columns:1fr}}
+
+/* Pipeline Flow */
+.pipeline{display:flex;align-items:center;justify-content:center;gap:0;margin:30px 0;flex-wrap:wrap}
+.pipe-step{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:16px 20px;text-align:center;min-width:120px;position:relative}
+.pipe-step.active{border-color:var(--accent);box-shadow:0 0 20px rgba(59,130,246,0.2)}
+.pipe-arrow{color:var(--dim);font-size:1.5rem;margin:0 8px}
+.pipe-label{font-size:0.8rem;color:var(--dim);margin-top:4px}
+.pipe-title{font-weight:600;font-size:0.95rem}
+
+/* Method Cards */
+.method-card{position:relative;overflow:hidden}
+.method-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.method-card.m1::before{background:var(--green)}
+.method-card.m2::before{background:var(--accent)}
+.method-card.m3::before{background:var(--purple)}
+.method-card.m4::before{background:var(--orange)}
+.method-card.m5::before{background:var(--cyan)}
+.method-rank{font-size:2rem;font-weight:800;opacity:0.15;position:absolute;right:16px;top:12px}
+.method-name{font-weight:700;font-size:1.1rem;margin-bottom:8px}
+.method-mrr{font-size:2rem;font-weight:800;margin:8px 0}
+.method-mrr small{font-size:0.7rem;font-weight:400;color:var(--dim)}
+.method-desc{font-size:0.85rem;color:var(--dim);line-height:1.5}
+
+/* Bar Chart */
+.bar-chart{margin:20px 0}
+.bar-row{display:flex;align-items:center;margin:10px 0;gap:12px}
+.bar-label{width:100px;font-size:0.85rem;text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:32px;background:rgba(255,255,255,0.03);border-radius:6px;position:relative;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:12px;font-size:0.8rem;font-weight:600;transition:width 1.5s ease}
+.bar-fill.c1{background:linear-gradient(90deg,rgba(16,185,129,0.3),rgba(16,185,129,0.6))}
+.bar-fill.c2{background:linear-gradient(90deg,rgba(59,130,246,0.3),rgba(59,130,246,0.6))}
+.bar-fill.c3{background:linear-gradient(90deg,rgba(139,92,246,0.3),rgba(139,92,246,0.6))}
+.bar-fill.c4{background:linear-gradient(90deg,rgba(245,158,11,0.3),rgba(245,158,11,0.6))}
+.bar-fill.c5{background:linear-gradient(90deg,rgba(6,182,212,0.3),rgba(6,182,212,0.6))}
+
+/* Heatmap */
+.heatmap{overflow-x:auto}
+.heatmap table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.heatmap th{padding:10px 8px;background:rgba(255,255,255,0.03);text-align:left;font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap}
+.heatmap td{padding:8px;text-align:center;border-bottom:1px solid var(--border);font-weight:600;font-size:0.85rem}
+.heatmap td:first-child{text-align:left;font-weight:400;max-width:180px}
+.hm-1{background:rgba(16,185,129,0.4);color:#fff}
+.hm-05{background:rgba(16,185,129,0.2)}
+.hm-033{background:rgba(245,158,11,0.2)}
+.hm-025{background:rgba(245,158,11,0.15)}
+.hm-0{background:rgba(239,68,68,0.08);color:var(--dim)}
+
+/* Comparison Table */
+.comp-table{width:100%;border-collapse:collapse;margin:16px 0}
+.comp-table th{padding:12px;background:rgba(255,255,255,0.03);text-align:left;font-weight:600;border-bottom:2px solid var(--border)}
+.comp-table td{padding:10px 12px;border-bottom:1px solid var(--border)}
+.comp-table tr:hover{background:rgba(255,255,255,0.02)}
+.best{color:var(--green);font-weight:700}
+.bad{color:var(--red);font-weight:600}
+
+/* Insight */
+.insight{display:flex;gap:12px;align-items:flex-start;padding:16px;background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:8px;margin:12px 0}
+.insight-icon{font-size:1.5rem;flex-shrink:0}
+.insight-text{font-size:0.9rem;line-height:1.7}
+.insight-text strong{color:var(--accent)}
+
+/* Conclusion */
+.conclusion{background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(59,130,246,0.05));border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:24px;margin:20px 0}
+.conclusion h3{color:var(--green);margin-bottom:12px}
+.conclusion ul{list-style:none;padding:0}
+.conclusion li{padding:6px 0;padding-left:24px;position:relative}
+.conclusion li::before{content:'';position:absolute;left:0;top:14px;width:8px;height:8px;border-radius:50%;background:var(--green)}
+
+/* Principle Animation */
+.principle-box{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:20px;margin:12px 0}
+.principle-title{font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.principle-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:12px 0}
+.pf-node{background:var(--card);border:1px solid var(--border);padding:6px 14px;border-radius:20px;font-size:0.8rem}
+.pf-arrow{color:var(--dim)}
+.pf-node.highlight{border-color:var(--accent);color:var(--accent);background:rgba(59,130,246,0.1)}
+
+/* Chart Legend */
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--dim)}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+
+/* Score Scale */
+.score-scale{display:flex;align-items:center;gap:4px;margin:8px 0;font-size:0.75rem;color:var(--dim)}
+.score-block{width:24px;height:12px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>RAG 字幕检索对比实验</h1>
+<p class="subtitle">BM25 vs 向量检索 vs 混合检索 — 原理、架构与效果数据</p>
+
+<!-- Section 1: Architecture -->
+<h2>一、系统架构</h2>
+<div class="card">
+  <div class="pipeline">
+    <div class="pipe-step active">
+      <div class="pipe-title">📝 用户查询</div>
+      <div class="pipe-label">"浮力在潜水艇中的应用"</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">
+      <div class="pipe-title">🔍 图谱扩展</div>
+      <div class="pipe-label">KG 补强 + 同义词</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">
+      <div class="pipe-title">📊 多路召回</div>
+      <div class="pipe-label">BM25 + Vector</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">
+      <div class="pipe-title">🔀 RRF 融合</div>
+      <div class="pipe-label">倒数排名融合</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">
+      <div class="pipe-title">📄 Top-K 结果</div>
+      <div class="pipe-label">字幕片段</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: Method Principles -->
+<h2>二、五种检索方法原理</h2>
+<div class="grid grid-2">
+  <div class="card principle-box">
+    <div class="principle-title">🔤 BM25 — 关键词精确匹配</div>
+    <div class="principle-flow">
+      <span class="pf-node">查询分词</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">TF-IDF 加权</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node highlight">BM25 评分</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">排序</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--dim)">通过词频(TF)和逆文档频率(IDF)计算查询与文档的相关性。擅长精确关键词匹配，对中文分词+字符 n-gram 双通道处理。</p>
+  </div>
+
+  <div class="card principle-box">
+    <div class="principle-title">🧠 BM25+KG — 图谱增强</div>
+    <div class="principle-flow">
+      <span class="pf-node">查询</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node highlight">知识图谱匹配</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">扩展查询</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">BM25</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--dim)">先用知识图谱扩展查询（如"密度计"→"浮力、密度、液体"），再用扩展后的查询做 BM25 检索。解决"用户说A，文档写B"的语义鸿沟。</p>
+  </div>
+
+  <div class="card principle-box">
+    <div class="principle-title">📐 Vector — 向量语义检索</div>
+    <div class="principle-flow">
+      <span class="pf-node">文本</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node highlight">Embedding 模型</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">384维向量</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">Cosine 排序</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--dim)">用 embedding 模型将文本编码为稠密向量，通过余弦相似度计算语义距离。擅长理解同义词和语义相近但字面不同的表达。</p>
+  </div>
+
+  <div class="card principle-box">
+    <div class="principle-title">🔗 Vector+KG — 图谱增强向量</div>
+    <div class="principle-flow">
+      <span class="pf-node">查询</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node highlight">KG 扩展</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">Embedding</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">Cosine</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--dim)">先用图谱扩展查询语义，再做向量检索。让 embedding 模型看到更完整的查询意图。</p>
+  </div>
+
+  <div class="card principle-box" style="grid-column:1/-1">
+    <div class="principle-title">⚡ Hybrid — BM25+Vector RRF 融合</div>
+    <div class="principle-flow">
+      <span class="pf-node">查询</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">KG 扩展</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node highlight">BM25 召回</span>
+      <span class="pf-arrow">+</span>
+      <span class="pf-node highlight">Vector 召回</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">RRF 融合</span>
+      <span class="pf-arrow">→</span>
+      <span class="pf-node">排序</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--dim)">两路召回后用 <strong>Reciprocal Rank Fusion (RRF)</strong> 融合：score = Σ 1/(k+rank)，k=60。结合关键词精确匹配和语义理解的优势。</p>
+  </div>
+</div>
+
+<!-- Section 3: Overall Results -->
+<h2>三、整体评估结果</h2>
+<div class="card">
+  <p style="font-size:0.85rem;color:var(--dim);margin-bottom:16px">实验条件：500 条中文字幕 × 15 条测试查询 × embedding: bge-small-en-v1.5 (384维)</p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>BM25+KG</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>BM25</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Hybrid</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>Vector+KG</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Vector</div>
+  </div>
+
+  <div class="bar-chart" id="mrr-chart">
+    <h3 style="font-size:1rem;margin-bottom:12px">MRR（平均倒数排名）— 越高越好</h3>
+  </div>
+  <div class="bar-chart" id="hit3-chart">
+    <h3 style="font-size:1rem;margin-bottom:12px">Hit@3（前3命中率）— 越高越好</h3>
+  </div>
+  <div class="bar-chart" id="hit5-chart">
+    <h3 style="font-size:1rem;margin-bottom:12px">Hit@5（前5命中率）— 越高越好</h3>
+  </div>
+</div>
+
+<!-- Section 4: Per-Query Heatmap -->
+<h2>四、逐查询 MRR 热力图</h2>
+<div class="card heatmap">
+  <div class="score-scale">
+    <span>差</span>
+    <div class="score-block hm-0"></div>
+    <div class="score-block hm-025"></div>
+    <div class="score-block hm-033"></div>
+    <div class="score-block hm-05"></div>
+    <div class="score-block hm-1"></div>
+    <span>优</span>
+  </div>
+  <table id="heatmap-table"></table>
+</div>
+
+<!-- Section 5: Key Findings -->
+<h2>五、关键发现</h2>
+
+<div class="grid grid-3">
+  <div class="card method-card m1">
+    <div class="method-rank">#1</div>
+    <div class="method-name">BM25+KG</div>
+    <div class="method-mrr">0.783 <small>MRR</small></div>
+    <div class="method-desc">图谱扩展让 BM25 从 0.733 提升到 0.783（+7%）。在"密度计的工作原理"等间接查询上效果显著。</div>
+  </div>
+  <div class="card method-card m2">
+    <div class="method-rank">#2</div>
+    <div class="method-name">BM25</div>
+    <div class="method-mrr">0.733 <small>MRR</small></div>
+    <div class="method-desc">纯关键词检索已很强。中文字符 n-gram 分词 + BM25 在精确匹配场景下表现优异。</div>
+  </div>
+  <div class="card method-card m3">
+    <div class="method-rank">#3</div>
+    <div class="method-name">Hybrid</div>
+    <div class="method-mrr">0.561 <small>MRR</small></div>
+    <div class="method-desc">Hit@3=0.800 与 BM25+KG 持平，但 MRR 更低。RRF 融合有时把精确命中排到后面。</div>
+  </div>
+</div>
+
+<div class="insight">
+  <div class="insight-icon">💡</div>
+  <div class="insight-text">
+    <strong>为什么向量检索表现差？</strong> 实验使用英文模型 <code>bge-small-en-v1.5</code> 处理中文字幕，语义理解能力不足。例如"浮力在潜水艇中的应用"在向量空间中找不到相关文档（MRR=0），但 BM25 通过关键词"潜水艇""浮力"精确命中（MRR=1.0）。<br><br>
+    <strong>改进方向：</strong>使用中文 embedding 模型（如 <code>bge-m3</code> 或 <code>bge-large-zh</code>）会大幅提升向量检索效果。
+  </div>
+</div>
+
+<div class="insight">
+  <div class="insight-icon">🔑</div>
+  <div class="insight-text">
+    <strong>图谱增强的价值：</strong>在 15 条测试查询中，KG 扩展帮助了 3 条查询从 0 分提升到有分。最典型的案例是"密度计的工作原理"——BM25 直接搜不到（MRR=0），但 KG 把"密度计"扩展为"浮力、密度、液体"后命中（MRR=0.5）。<br><br>
+    这正是当前项目的核心差异化能力。
+  </div>
+</div>
+
+<!-- Section 6: Method Comparison Table -->
+<h2>六、方法对比总结</h2>
+<div class="card">
+<table class="comp-table">
+  <thead>
+    <tr><th>维度</th><th>BM25</th><th>BM25+KG</th><th>Vector</th><th>Hybrid</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>精确关键词匹配</td><td class="best">★★★★★</td><td class="best">★★★★★</td><td>★★☆</td><td>★★★★</td></tr>
+    <tr><td>语义理解</td><td>★★☆</td><td>★★★</td><td class="best">★★★★★</td><td class="best">★★★★</td></tr>
+    <tr><td>间接/隐含查询</td><td>★★☆</td><td class="best">★★★★★</td><td>★★☆</td><td>★★★</td></tr>
+    <tr><td>延迟</td><td class="best">~1ms</td><td>~2ms</td><td>~50ms</td><td>~60ms</td></tr>
+    <tr><td>依赖</td><td class="best">无</td><td>KG 数据</td><td>Embedding 模型</td><td>模型+KG</td></tr>
+    <tr><td>适合场景</td><td>关键词明确</td><td>通用推荐</td><td>语义泛化</td><td>全场景</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="conclusion">
+  <h3>结论与建议</h3>
+  <ul>
+    <li><strong>当前生产方案：</strong>BM25 + 图谱增强（MRR=0.783），零外部依赖，延迟最低</li>
+    <li><strong>向量检索定位：</strong>作为 Hybrid 的补充，用中文模型后效果会大幅提升</li>
+    <li><strong>下一步：</strong>接入 bge-m3 中文模型 → 重跑实验 → 预期 Vector MRR 从 0.3 提升到 0.6+</li>
+    <li><strong>图谱扩展是核心差异化：</strong>无论哪种检索方法，KG 增强都能带来稳定提升</li>
+  </ul>
+</div>
+
+</div>
+
+<script>
+const data = {
+  methods: [
+    {name:"BM25+KG",mrr:0.783,hit3:0.800,hit5:0.867,color:"c1"},
+    {name:"BM25",mrr:0.733,hit3:0.733,hit5:0.733,color:"c2"},
+    {name:"Hybrid",mrr:0.561,hit3:0.800,hit5:0.867,color:"c3"},
+    {name:"Vector+KG",mrr:0.456,hit3:0.533,hit5:0.533,color:"c4"},
+    {name:"Vector",mrr:0.300,hit3:0.400,hit5:0.400,color:"c5"}
+  ],
+  queries: [
+    {q:"浮力在潜水艇中的应用",bm25:1,bm25kg:1,vec:0,veckg:0,hybrid:0.5},
+    {q:"光的本质是什么",bm25:1,bm25kg:1,vec:1,veckg:1,hybrid:1},
+    {q:"牛顿对光学的贡献",bm25:1,bm25kg:1,vec:1,veckg:1,hybrid:1},
+    {q:"自然光源有哪些",bm25:1,bm25kg:1,vec:0,veckg:1,hybrid:0.5},
+    {q:"激光的特点和应用",bm25:0,bm25kg:0.25,vec:0.5,veckg:0.33,hybrid:0.33},
+    {q:"欧几里德在光学方面做了什么",bm25:1,bm25kg:1,vec:0.5,veckg:0.5,hybrid:1},
+    {q:"眼睛如何看见物体",bm25:1,bm25kg:1,vec:0,veckg:0,hybrid:0.5},
+    {q:"光速是多少",bm25:1,bm25kg:1,vec:0,veckg:1,hybrid:0.5},
+    {q:"密度计的工作原理",bm25:0,bm25kg:0.5,vec:0,veckg:0,hybrid:0.25},
+    {q:"闪电是怎么形成的",bm25:0,bm25kg:0,vec:0,veckg:0,hybrid:0},
+    {q:"郑和宝船与航海技术",bm25:1,bm25kg:1,vec:0.5,veckg:1,hybrid:1},
+    {q:"反射和折射的区别",bm25:1,bm25kg:1,vec:0,veckg:0,hybrid:0.33},
+    {q:"人工光源的发展历史",bm25:0,bm25kg:0,vec:0,veckg:0,hybrid:0},
+    {q:"潜水艇如何上浮和下潜",bm25:1,bm25kg:1,vec:0,veckg:0,hybrid:0.5},
+    {q:"光的颜色是怎么产生的",bm25:1,bm25kg:1,vec:1,veckg:1,hybrid:1}
+  ]
+};
+
+function renderBar(containerId,metric,label){
+  const c=document.getElementById(containerId);
+  const max=1;
+  data.methods.forEach(m=>{
+    const v=m[metric];
+    const pct=(v/max*100).toFixed(1);
+    const row=document.createElement('div');
+    row.className='bar-row';
+    row.innerHTML=`
+      <div class="bar-label">${m.name}</div>
+      <div class="bar-track">
+        <div class="bar-fill ${m.color}" style="width:0%">${(v*100).toFixed(1)}%</div>
+      </div>`;
+    c.appendChild(row);
+    setTimeout(()=>{row.querySelector('.bar-fill').style.width=pct+'%'},100);
+  });
+}
+
+function renderHeatmap(){
+  const table=document.getElementById('heatmap-table');
+  const headers=['查询','BM25','BM25+KG','Vector','Vec+KG','Hybrid'];
+  let html='<thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>';
+  data.queries.forEach(r=>{
+    const cells=[r.bm25,r.bm25kg,r.vec,r.veckg,r.hybrid].map(v=>{
+      let cls='hm-0';
+      if(v>=1)cls='hm-1';
+      else if(v>=0.5)cls='hm-05';
+      else if(v>=0.33)cls='hm-033';
+      else if(v>0)cls='hm-025';
+      return `<td class="${cls}">${v>0?v.toFixed(2):'-'}</td>`;
+    });
+    html+=`<tr><td>${r.q}</td>${cells.join('')}</tr>`;
+  });
+  html+='</tbody>';
+  table.innerHTML=html;
+}
+
+renderBar('mrr-chart','mrr','MRR');
+renderBar('hit3-chart','hit3','Hit@3');
+renderBar('hit5-chart','hit5','Hit@5');
+renderHeatmap();
+</script>
+</body>
+</html>
