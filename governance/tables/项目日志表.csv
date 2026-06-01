@@ -1,0 +1,2 @@
+LOG-ID,时间,类型,关联REQ-ID,阶段,结论,证据,下一步,责任角色,备注
+LOG-001,2026-06-01,治理,REQ-001,Phase0-初始化,项目治理基础设施搭建完成,git worktree list;文件树,等待owner确认后开始第一条研发需求,pm-governance,首次建项

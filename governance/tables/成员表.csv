@@ -1,0 +1,11 @@
+member_id,member_name,role,main_responsibility,workspace_path,branch,skills,tools,env_file,ports,artifacts_path,log_path,write_scope,review_scope,merge_scope,ci_cd_scope,handoff_to,notes
+owner,ouakira,owner,项目目标与优先级决策,/Users/ouakira/rag-search,main,-,git;gh,,-,governance/tables,governance/logs,全部,全部,全部,全部,pm-governance,项目Owner
+pm-governance,PM,pm-governance,需求拆解;治理判定;流程设计;经验沉淀,/Users/ouakira/rag-search,main,project-pm-ops,git;codegraph;python3,,-,governance/tables,.governance/logs,全部,全部,全部,全部,algo-dev;be-dev;fe-dev,治理合同和需求表的主要维护者
+algo-dev,AlgoDev,algo-dev,向量检索优化;embedding策略;融合算法;KG查询策略,workspaces/algo-dev,feat/algo-dev,-,python3;git,workspaces/algo-dev/.env,APP_PORT=8001,experiments/,governance/logs,rag_search/vector.py;rag_search/graph.py;rag_search/rag.py;rag_search/text.py;experiments/,无,无,无,be-dev;verify-scan,核心算法层研发
+be-dev,BeDev,be-dev,ES服务;Neo4j服务;API接口;RAG pipeline后端;数据导入,workspaces/be-dev,feat/be-dev,-,python3;git;docker,workspaces/be-dev/.env,APP_PORT=8002;ES_PORT=9201;NEO4J_HTTP=7475;NEO4J_BOLT=7688,governance/logs,governance/logs,rag_search/es_backend.py;rag_search/web.py;rag_search/index.py;rag_search/llm.py;scripts/;data/,无,无,无,fe-dev;verify-scan,后端服务层研发
+fe-dev,FeDev,fe-dev,Web UI;用户交互;页面展示;前端状态管理,workspaces/fe-dev,feat/fe-dev,-,node;npm;git,workspaces/fe-dev/.env,APP_PORT=3000;BACKEND_URL=http://127.0.0.1:8002,governance/logs,governance/logs,frontend/;rag_search/web.py(前端部分),无,无,无,verify-scan,前端研发;与后端API契约对齐
+verify-scan,Verify,verify-scan,黑盒验证;链路扫描;事实采集;回归验证,workspaces/verify,feat/verify,-,python3;git,workspaces/verify/.env,APP_PORT=8003,governance/logs,governance/logs,experiments/;scripts/smoke_test.py,全部(只读),无,无,triage,验证事实而非表演PASS
+triage,Triage,triage,失败分诊;定责;回流,无独立工作区(在main执行),-,project-pm-ops,python3,-,-,governance/logs,governance/logs,无,全部(只读),无,无,algo-dev;be-dev;fe-dev,分诊不是代码审查
+ai-review,AIReview,ai-review,只读代码审查;重复实现检测;越层检测;危险模式识别,workspaces/ai-review,review/ai,-,git;codegraph,-,-,governance/logs,governance/logs,无,全部(只读),无,无,pm-governance,AI审核守门
+arch-review,ArchReview,arch-review,高风险结构变更审核;新页面/路由/API/公共模块审核,无独立工作区(在main执行),-,architect-skill,git;codegraph,-,-,governance/logs,governance/logs,无,全部(只读),无,无,pm-governance,只审高风险变更
+release-manager,ReleaseMgr,release-manager,最终项目合并;GitHub CI/CD,无独立工作区(在main执行),main,-,git;gh,-,-,governance/logs,governance/logs,main分支,全部,全部,全部,owner,合并守门与发布

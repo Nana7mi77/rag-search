@@ -1,0 +1,42 @@
+你是一名前端研发，工作在 rag-search 项目的 workspaces/fe-dev 工作区。
+
+## 目标
+将搜索结果从列表样式改为卡片式UI，每张卡片展示纪录片片段信息并可点击跳转B站。
+
+## 当前状态
+- 前端HTML内嵌在 `rag_search/web.py` 的 `HTML` 变量中（内联JS+CSS）
+- 当前渲染方式: `renderResult()` 函数用 `.hit` div 渲染每条结果
+- 搜索API返回: `{hits: [{title, time, score, snippet, doc_name, start_seconds, bilibili_url, ...}]}`
+- be-dev 已完成API字段扩展（doc_name, start_seconds, bilibili_url）
+
+## 约束
+1. 只修改 `rag_search/web.py` 中的 `HTML` 变量（CSS + JS 部分）
+2. 不修改 Python 后端逻辑
+3. 卡片设计要求:
+   - 卡片宽度自适应，网格布局（2列或3列）
+   - 每张卡片包含:
+     - 顶部: SVG占位截图（16:9比例，渐变背景+纪录片名字）
+     - 中间: 纪录片名（大字）+ 时间戳
+     - 底部: 字幕文本（最多3行，超出省略）
+     - 右上角: 相关度分数
+   - 卡片整体可点击，跳转 `bilibili_url`（新窗口打开）
+   - hover 时有阴影/边框高亮效果
+4. SVG占位截图样式:
+   - 16:9 宽高比
+   - 渐变背景（深蓝到紫色）
+   - 中间显示纪录片名
+   - 底部显示时间戳
+5. 颜色方案保持现有的 `--accent: #315f72` 等变量
+6. 响应式: 大屏3列，中屏2列，小屏1列
+
+## 必读文件
+- `rag_search/web.py` - 现有前端HTML（重点看 HTML 变量中的 CSS 和 JS）
+
+## 输出产物
+修改 `rag_search/web.py` 中的 HTML 变量，替换搜索结果渲染部分
+
+## 完成信号
+- HTML语法正确
+- CSS包含卡片网格布局
+- JS的 renderResult 函数渲染卡片而非列表
+- 卡片点击跳转 bilibili_url

@@ -1,0 +1,36 @@
+{
+  "version": "V1",
+  "triggers": {
+    "arch_review": {
+      "description": "直接触发A2 ARCH REVIEW",
+      "conditions": [
+        "新增页面/路由",
+        "新增公共组件",
+        "新增公共 service/store/controller/agent",
+        "新增 API 或接口契约变化",
+        "删除公共能力",
+        "新增依赖",
+        "同时改前端、后端、算法三层中的两层及以上",
+        "疑似重复造轮子",
+        "疑似前端实现后端职责"
+      ]
+    },
+    "ai_review": {
+      "description": "触发A1 AI REVIEW",
+      "conditions": [
+        "改动文件数 >= 5",
+        "新增/删除行数 >= 200",
+        "修改公共模块",
+        "修改接口层",
+        "修改公共状态层",
+        "涉及依赖变更"
+      ]
+    }
+  },
+  "diff_check_rules": {
+    "parallel_implementation": "是否新增了与现有功能重复的实现",
+    "layer_violation": "前端是否实现了后端职责",
+    "scope_exceed": "是否超出任务授权范围",
+    "second_truth": "是否引入了第二真相源"
+  }
+}

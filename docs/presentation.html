@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG 字幕检索优化 — 可视化汇报</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f172a;--card:#1e293b;--border:#334155;
+  --text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;
+  --green:#4ade80;--red:#f87171;--yellow:#facc15;--purple:#a78bfa;--pink:#f472b6;
+  --gradient:linear-gradient(135deg,#38bdf8,#818cf8);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+
+/* Navigation */
+nav{position:fixed;top:0;left:0;right:0;background:rgba(15,23,42,0.95);backdrop-filter:blur(10px);z-index:100;border-bottom:1px solid var(--border)}
+nav .inner{max-width:1200px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:20px;overflow-x:auto}
+nav .logo{font-weight:700;font-size:18px;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+nav a{color:var(--muted);text-decoration:none;font-size:13px;white-space:nowrap;transition:color .2s}
+nav a:hover{color:var(--accent)}
+nav a.active{color:var(--accent)}
+
+/* Slide System */
+.slide{min-height:100vh;padding:80px 20px 40px;display:flex;align-items:center;justify-content:center}
+.slide-inner{max-width:1100px;width:100%;animation:fadeIn .6s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;margin:16px 0}
+.card-title{font-size:20px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.card-title .icon{font-size:24px}
+
+/* Typography */
+h1{font-size:48px;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px;line-height:1.2}
+h2{font-size:32px;font-weight:700;margin-bottom:20px;color:var(--text)}
+h3{font-size:22px;font-weight:600;margin-bottom:12px;color:var(--text)}
+.subtitle{font-size:18px;color:var(--muted);margin-bottom:24px}
+.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-blue{background:rgba(56,189,248,0.15);color:var(--accent)}
+.badge-green{background:rgba(74,222,128,0.15);color:var(--green)}
+.badge-red{background:rgba(248,113,113,0.15);color:var(--red)}
+.badge-yellow{background:rgba(250,204,21,0.15);color:var(--yellow)}
+.badge-purple{background:rgba(167,139,250,0.15);color:var(--purple)}
+
+/* Grid */
+.grid{display:grid;gap:16px}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:768px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+
+/* Architecture Diagram */
+.arch-flow{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;padding:20px 0}
+.arch-node{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:16px 20px;text-align:center;min-width:120px;transition:all .3s;cursor:pointer}
+.arch-node:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 8px 24px rgba(56,189,248,0.2)}
+.arch-node.highlight{border-color:var(--green);background:rgba(74,222,128,0.1)}
+.arch-node.warn{border-color:var(--yellow);background:rgba(250,204,21,0.1)}
+.arch-node .node-icon{font-size:28px;margin-bottom:8px}
+.arch-node .node-title{font-weight:600;font-size:14px}
+.arch-node .node-desc{font-size:11px;color:var(--muted);margin-top:4px}
+.arch-arrow{color:var(--accent);font-size:24px;font-weight:bold}
+
+/* Pipeline Styles */
+.pipeline-horizontal{display:flex;align-items:stretch;gap:4px;padding:16px 0;overflow-x:auto}
+.pipe-stage{flex:1;min-width:140px;background:var(--card);border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;position:relative;transition:all .3s}
+.pipe-stage:hover{border-color:var(--accent)}
+.pipe-stage .stage-num{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.pipe-stage .stage-title{font-weight:600;margin-top:8px;font-size:14px}
+.pipe-stage .stage-detail{font-size:11px;color:var(--muted);margin-top:8px}
+.pipe-stage .stage-tech{font-size:10px;color:var(--accent);margin-top:8px;font-family:monospace}
+.pipe-connector{display:flex;align-items:center;color:var(--accent);font-size:20px;flex-shrink:0}
+
+/* Metric Cards */
+.metric-card{text-align:center;padding:24px}
+.metric-value{font-size:48px;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.metric-label{font-size:13px;color:var(--muted);margin-top:8px}
+.metric-delta{font-size:14px;margin-top:4px}
+.metric-delta.up{color:var(--green)}
+.metric-delta.down{color:var(--red)}
+
+/* Chart Container */
+.chart-container{position:relative;width:100%;padding:20px 0}
+
+/* Bar Chart */
+.bar-chart{display:flex;align-items:flex-end;gap:12px;height:240px;padding:0 10px}
+.bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;border-radius:8px 8px 0 0;transition:all .5s ease;position:relative;min-height:4px}
+.bar .bar-label{position:absolute;top:-24px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:600;white-space:nowrap}
+.bar .bar-value{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}
+.bar-group .group-label{font-size:11px;color:var(--muted);text-align:center;margin-top:24px}
+
+/* Line Chart via SVG */
+.line-chart{width:100%;height:300px}
+.line-chart svg{width:100%;height:100%}
+
+/* Heatmap */
+.heatmap{width:100%;overflow-x:auto}
+.heatmap table{width:100%;border-collapse:collapse;font-size:13px}
+.heatmap th{padding:10px 12px;background:var(--card);border:1px solid var(--border);font-weight:600;text-align:center;position:sticky;top:0;z-index:1}
+.heatmap td{padding:10px 12px;border:1px solid var(--border);text-align:center;font-weight:600;transition:all .2s}
+.heatmap tr:hover td{opacity:0.9}
+.heatmap .query-cell{text-align:left;font-weight:400;color:var(--muted);min-width:180px}
+.cell-100{background:rgba(74,222,128,0.3);color:var(--green)}
+.cell-50{background:rgba(250,204,21,0.3);color:var(--yellow)}
+.cell-33{background:rgba(248,113,113,0.3);color:var(--red)}
+.cell-25{background:rgba(248,113,113,0.2);color:var(--red)}
+.cell-0{background:rgba(248,113,113,0.1);color:var(--red)}
+.cell-na{background:transparent;color:var(--muted)}
+
+/* Comparison Table */
+.compare-table{width:100%;border-collapse:collapse}
+.compare-table th{padding:12px;background:var(--card);border:1px solid var(--border);font-weight:600;text-align:center}
+.compare-table td{padding:12px;border:1px solid var(--border);text-align:center}
+.compare-table tr:hover td{background:rgba(56,189,248,0.05)}
+.best{color:var(--green);font-weight:700}
+.worst{color:var(--red)}
+
+/* Bullet List */
+.bullet-list{list-style:none;padding:0}
+.bullet-list li{padding:12px 16px;margin:8px 0;background:rgba(56,189,248,0.05);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:15px}
+.bullet-list li strong{color:var(--accent)}
+
+/* Scroll Animations */
+.reveal{opacity:0;transform:translateY(30px);transition:all .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* Progress Dots */
+.slide-dots{position:fixed;right:20px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:100}
+.slide-dot{width:10px;height:10px;border-radius:50%;background:var(--border);cursor:pointer;transition:all .2s}
+.slide-dot.active{background:var(--accent);transform:scale(1.3)}
+.slide-dot:hover{background:var(--accent)}
+
+/* Architecture Diagram - Two Stage */
+.two-stage-arch{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:stretch;padding:20px 0}
+.stage-box{background:var(--card);border:2px solid var(--border);border-radius:16px;padding:24px;position:relative}
+.stage-box .stage-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.stage-box .stage-badge{background:var(--accent);color:var(--bg);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700}
+.stage-box .stage-title{font-size:18px;font-weight:700}
+.stage-box .stage-subtitle{font-size:13px;color:var(--muted);margin-top:4px}
+.stage-divider{display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--accent)}
+
+/* Timeline */
+.timeline{position:relative;padding:20px 0}
+.timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--border)}
+.timeline-item{display:flex;align-items:center;margin:20px 0}
+.timeline-item:nth-child(odd){flex-direction:row-reverse}
+.timeline-item .timeline-content{width:45%;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+.timeline-item .timeline-dot{width:16px;height:16px;background:var(--accent);border-radius:50%;position:absolute;left:50%;transform:translateX(-50%)}
+.timeline-item .timeline-version{font-weight:700;color:var(--accent);margin-bottom:8px}
+.timeline-item .timeline-mrr{font-size:24px;font-weight:800}
+.timeline-item .timeline-desc{font-size:13px;color:var(--muted);margin-top:8px}
+
+/* Responsive */
+@media(max-width:768px){
+  h1{font-size:32px}
+  h2{font-size:24px}
+  .arch-flow{flex-direction:column}
+  .arch-arrow{transform:rotate(90deg)}
+  .pipeline-horizontal{flex-direction:column}
+  .pipe-connector{transform:rotate(90deg)}
+  .two-stage-arch{grid-template-columns:1fr}
+  .stage-divider{transform:rotate(90deg)}
+  .timeline::before{left:20px}
+  .timeline-item{flex-direction:column!important}
+  .timeline-item .timeline-content{width:100%;margin-left:40px}
+  .timeline-item .timeline-dot{left:20px}
+}
+
+/* Print */
+@media print{
+  nav,.slide-dots{display:none}
+  .slide{min-height:auto;padding:20px 0;page-break-inside:avoid}
+  body{background:#fff;color:#000}
+  .card{border:1px solid #ddd;background:#f9f9f9}
+}
+
+/* Solution Cards */
+.solution-card{background:var(--card);border:2px solid var(--border);border-radius:16px;padding:24px;transition:all .3s;cursor:pointer}
+.solution-card:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 12px 32px rgba(56,189,248,0.15)}
+.solution-card .sol-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.solution-card .sol-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.solution-card .sol-title{font-size:18px;font-weight:700}
+.solution-card .sol-mrr{font-size:32px;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.solution-card .sol-detail{font-size:13px;color:var(--muted);margin-top:12px}
+.solution-card .sol-features{list-style:none;padding:0;margin-top:12px}
+.solution-card .sol-features li{padding:6px 0;font-size:13px;display:flex;align-items:center;gap:8px}
+.solution-card .sol-features li::before{content:'✓';color:var(--green);font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+<div class="inner">
+  <div class="logo">🔍 RAG 检索优化</div>
+  <a href="#cover" class="active">首页</a>
+  <a href="#arch">系统架构</a>
+  <a href="#two-stage">两阶段检索</a>
+  <a href="#evolution">MRR 演进</a>
+  <a href="#methods">方法对比</a>
+  <a href="#heatmap">热力图</a>
+  <a href="#solutions">生产方案</a>
+  <a href="#future">未来方向</a>
+</div>
+</nav>
+
+<!-- Slide Dots -->
+<div class="slide-dots" id="slideDots"></div>
+
+<!-- ==================== SLIDE 1: Cover ==================== -->
+<div class="slide" id="cover">
+<div class="slide-inner" style="text-align:center">
+  <div style="font-size:80px;margin-bottom:20px">🔍</div>
+  <h1>RAG 字幕检索优化</h1>
+  <p class="subtitle">BBC 纪录片字幕语义检索系统 · 完整技术路线</p>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:32px">
+    <div class="metric-card card" style="min-width:140px">
+      <div class="metric-value" style="font-size:36px">9</div>
+      <div class="metric-label">实验轮次</div>
+    </div>
+    <div class="metric-card card" style="min-width:140px">
+      <div class="metric-value" style="font-size:36px">166+</div>
+      <div class="metric-label">配置组合</div>
+    </div>
+    <div class="metric-card card" style="min-width:140px">
+      <div class="metric-value" style="font-size:36px">0.907</div>
+      <div class="metric-label">最优 MRR</div>
+    </div>
+    <div class="metric-card card" style="min-width:140px">
+      <div class="metric-value" style="font-size:36px">6,071</div>
+      <div class="metric-label">字幕文档</div>
+    </div>
+  </div>
+  <div style="margin-top:40px;color:var(--muted);font-size:14px">
+    <span class="badge badge-blue">BAAI/bge-m3</span>
+    <span class="badge badge-green">BAAI/bge-reranker-v2-m3</span>
+    <span class="badge badge-purple">MPS GPU 加速</span>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 2: System Architecture ==================== -->
+<div class="slide" id="arch">
+<div class="slide-inner">
+  <h2>🏗️ 系统架构</h2>
+  <p class="subtitle">从用户查询到最终结果的完整数据流</p>
+
+  <!-- Basic Pipeline -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📐</span>基础检索管线</div>
+    <div class="arch-flow">
+      <div class="arch-node">
+        <div class="node-icon">👤</div>
+        <div class="node-title">用户查询</div>
+        <div class="node-desc">自然语言问题</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="node-icon">🔤</div>
+        <div class="node-title">文本编码</div>
+        <div class="node-desc">bge-m3 向量化</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node highlight">
+        <div class="node-icon">🔍</div>
+        <div class="node-title">双路召回</div>
+        <div class="node-desc">BM25 + 向量检索</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="node-icon">🔀</div>
+        <div class="node-title">融合排序</div>
+        <div class="node-desc">WSF / RRF</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node highlight">
+        <div class="node-icon">📄</div>
+        <div class="node-title">Top-K 结果</div>
+        <div class="node-desc">字幕片段</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Components Detail -->
+  <div class="grid grid-3">
+    <div class="card">
+      <div class="card-title"><span class="icon">📊</span>数据层</div>
+      <ul class="bullet-list">
+        <li><strong>6,071 条</strong> BBC 纪录片字幕</li>
+        <li><strong>10 条</strong> 知识图谱术语</li>
+        <li>15 条测试查询 + 关键词标注</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">🧠</span>模型层</div>
+      <ul class="bullet-list">
+        <li><strong>bge-m3</strong> 568M 参数 embedding</li>
+        <li><strong>1024 维</strong>向量空间</li>
+        <li><strong>MPS</strong> Apple Silicon 加速</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">⚙️</span>检索层</div>
+      <ul class="bullet-list">
+        <li><strong>BM25</strong> 关键词精确匹配</li>
+        <li><strong>向量检索</strong> 语义相似度</li>
+        <li><strong>KG Boost</strong> 术语加权</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 3: Two-Stage Architecture ==================== -->
+<div class="slide" id="two-stage">
+<div class="slide-inner">
+  <h2>🚀 两阶段检索架构（V9 最优）</h2>
+  <p class="subtitle">Vec 召回 + 中文 Reranker 精排 → MRR=0.907</p>
+
+  <div class="two-stage-arch">
+    <!-- Stage 1 -->
+    <div class="stage-box" style="border-color:var(--accent)">
+      <div class="stage-header">
+        <span class="stage-badge">STAGE 1</span>
+        <div>
+          <div class="stage-title">候选召回</div>
+          <div class="stage-subtitle">粗排 → 50 候选</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:rgba(56,189,248,0.1);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:14px">📝 查询改写</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            "闪电是怎么形成的"<br>
+            → "闪电 放电 云层 电荷积累"<br>
+            → "闪电 雷电 放电现象 自然界"
+          </div>
+        </div>
+
+        <div style="background:rgba(74,222,128,0.1);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:14px">🔤 向量编码</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            bge-m3 → 1024 维向量<br>
+            原始查询 + 改写查询 分别编码
+          </div>
+        </div>
+
+        <div style="background:rgba(167,139,250,0.1);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:14px">🔍 向量检索</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            余弦相似度 Top-50<br>
+            多路召回 → MAX 融合
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="stage-divider">→</div>
+
+    <!-- Stage 2 -->
+    <div class="stage-box" style="border-color:var(--green)">
+      <div class="stage-header">
+        <span class="stage-badge" style="background:var(--green);color:var(--bg)">STAGE 2</span>
+        <div>
+          <div class="stage-title">精排重排</div>
+          <div class="stage-subtitle">中文 Cross-Encoder → Top-10</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:rgba(74,222,128,0.1);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:14px">🧠 Cross-Encoder</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            bge-reranker-v2-m3<br>
+            568M 参数 · 中文原生<br>
+            Query-Doc 联合编码
+          </div>
+        </div>
+
+        <div style="background:rgba(250,204,21,0.1);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:14px">⚡ 精排打分</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            50 个候选 × 1 对 = 50 次推理<br>
+            M1 MPS: ~1.3 pairs/s<br>
+            c50 总耗时 ~38s（优化后）
+          </div>
+        </div>
+
+        <div style="background:rgba(244,114,182,0.1);border-radius:8px;padding:12px">
+          <div style="font-weight:600;font-size:14px">📄 最终结果</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            Top-10 精排结果<br>
+            MRR=0.907 · Hit@5=1.000
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Insight -->
+  <div class="card" style="border-color:var(--green);background:rgba(74,222,128,0.05)">
+    <div class="card-title"><span class="icon">💡</span>关键洞察</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div style="text-align:center">
+        <div style="font-size:13px;color:var(--muted)">查询改写</div>
+        <div style="font-size:18px;font-weight:700;color:var(--accent)">桥接语义鸿沟</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Q9(闪电) 0.5→1.0</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:13px;color:var(--muted)">中文 Reranker</div>
+        <div style="font-size:18px;font-weight:700;color:var(--green)">语义精排确认</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">正确文档排到第1位</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:13px;color:var(--muted)">两阶段架构</div>
+        <div style="font-size:18px;font-weight:700;color:var(--purple)">粗排+精排</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">优于单阶段融合</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 4: MRR Evolution ==================== -->
+<div class="slide" id="evolution">
+<div class="slide-inner">
+  <h2>📈 MRR 演进全景图</h2>
+  <p class="subtitle">V1 → V9 · 从 0.889 到 0.907 的突破之路</p>
+
+  <div class="card">
+    <div class="chart-container">
+      <div class="line-chart" id="mrrChart"></div>
+    </div>
+  </div>
+
+  <!-- Milestones -->
+  <div class="grid grid-4" style="margin-top:20px">
+    <div class="card" style="text-align:center;padding:16px">
+      <div class="badge badge-blue">V1</div>
+      <div style="font-size:24px;font-weight:800;margin-top:8px">0.889</div>
+      <div style="font-size:12px;color:var(--muted)">RRF 首超 BM25+KG</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;border-color:var(--green)">
+      <div class="badge badge-green">V4</div>
+      <div style="font-size:24px;font-weight:800;color:var(--green);margin-top:8px">0.900</div>
+      <div style="font-size:12px;color:var(--muted)">WSF 突破天花板</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;border-color:var(--red)">
+      <div class="badge badge-red">V8</div>
+      <div style="font-size:24px;font-weight:800;color:var(--red);margin-top:8px">0.747</div>
+      <div style="font-size:12px;color:var(--muted)">英文 Reranker 失败</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;border-color:var(--accent)">
+      <div class="badge" style="background:var(--accent);color:var(--bg)">V9</div>
+      <div style="font-size:24px;font-weight:800;color:var(--accent);margin-top:8px">0.907</div>
+      <div style="font-size:12px;color:var(--muted)">中文 Reranker + 改写</div>
+    </div>
+  </div>
+
+  <!-- Baselines -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-title"><span class="icon">📊</span>基线对比</div>
+    <div class="bar-chart" id="baselineChart" style="height:200px"></div>
+    <div style="display:flex;gap:20px;justify-content:center;margin-top:30px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <div style="width:12px;height:12px;border-radius:3px;background:#f87171"></div>BM25
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <div style="width:12px;height:12px;border-radius:3px;background:#fb923c"></div>BM25+KG
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <div style="width:12px;height:12px;border-radius:3px;background:#a78bfa"></div>Vec
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <div style="width:12px;height:12px;border-radius:3px;background:#38bdf8"></div>WSF/RRF
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <div style="width:12px;height:12px;border-radius:3px;background:#4ade80"></div>V9 最优
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 5: Method Comparison ==================== -->
+<div class="slide" id="methods">
+<div class="slide-inner">
+  <h2>⚖️ 方法深度对比</h2>
+  <p class="subtitle">8 种检索方法的性能、原理与适用场景</p>
+
+  <!-- Solutions -->
+  <div class="grid grid-3">
+    <div class="solution-card" style="border-color:var(--red)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(248,113,113,0.15)">🔤</div>
+        <div>
+          <div class="sol-title">BM25</div>
+          <div style="font-size:12px;color:var(--muted)">关键词精确匹配</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.769</div>
+      <ul class="sol-features">
+        <li>词频统计 + TF-IDF</li>
+        <li>零依赖，延迟 ~1ms</li>
+        <li>关键词明确时最优</li>
+      </ul>
+    </div>
+
+    <div class="solution-card" style="border-color:var(--yellow)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(250,204,21,0.15)">📊</div>
+        <div>
+          <div class="sol-title">BM25+KG</div>
+          <div style="font-size:12px;color:var(--muted)">关键词 + 图谱增强</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.867</div>
+      <ul class="sol-features">
+        <li>知识图谱术语 boost</li>
+        <li>同义词扩展召回</li>
+        <li>需要 KG 数据</li>
+      </ul>
+    </div>
+
+    <div class="solution-card" style="border-color:var(--purple)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(167,139,250,0.15)">🧠</div>
+        <div>
+          <div class="sol-title">Vec (bge-m3)</div>
+          <div style="font-size:12px;color:var(--muted)">纯向量语义检索</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.800</div>
+      <ul class="sol-features">
+        <li>568M 参数 embedding</li>
+        <li>1024 维向量空间</li>
+        <li>语义泛化能力强</li>
+      </ul>
+    </div>
+
+    <div class="solution-card" style="border-color:var(--accent)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(56,189,248,0.15)">🔀</div>
+        <div>
+          <div class="sol-title">WSF (V4)</div>
+          <div style="font-size:12px;color:var(--muted)">加权分数融合</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.900</div>
+      <ul class="sol-features">
+        <li>归一化分数加权</li>
+        <li>Vec_w=0.5, 候选集=50</li>
+        <li>Hit@3=1.000, Hit@5=1.000</li>
+      </ul>
+    </div>
+
+    <div class="solution-card" style="border-color:var(--accent)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(56,189,248,0.15)">📈</div>
+        <div>
+          <div class="sol-title">RRF (V7)</div>
+          <div style="font-size:12px;color:var(--muted)">倒数排名融合</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.900</div>
+      <ul class="sol-features">
+        <li>只用排名不看分数</li>
+        <li>k=30, Vec_w=1.5</li>
+        <li>参数区间宽泛，鲁棒</li>
+      </ul>
+    </div>
+
+    <div class="solution-card" style="border-color:var(--green);border-width:3px">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(74,222,128,0.15)">🚀</div>
+        <div>
+          <div class="sol-title">V9 最优</div>
+          <div style="font-size:12px;color:var(--green)">Rewrite+Vec+Rerank</div>
+        </div>
+      </div>
+      <div class="sol-mrr" style="color:var(--green)">0.907</div>
+      <ul class="sol-features">
+        <li>查询改写 + 向量召回</li>
+        <li>中文 Reranker 精排</li>
+        <li>Q9(闪电) 完全修复</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Detailed Comparison Table -->
+  <div class="card" style="margin-top:24px">
+    <div class="card-title"><span class="icon">📋</span>性能详细对比</div>
+    <div style="overflow-x:auto">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>方法</th>
+            <th>MRR</th>
+            <th>Hit@3</th>
+            <th>Hit@5</th>
+            <th>语义理解</th>
+            <th>延迟</th>
+            <th>依赖</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:left;font-weight:600">BM25</td>
+            <td>0.769</td>
+            <td>0.800</td>
+            <td>0.867</td>
+            <td>★★☆</td>
+            <td class="best">~1ms</td>
+            <td class="best">无</td>
+          </tr>
+          <tr>
+            <td style="text-align:left;font-weight:600">BM25+KG</td>
+            <td>0.867</td>
+            <td>0.867</td>
+            <td>0.867</td>
+            <td>★★★</td>
+            <td>~2ms</td>
+            <td>KG 数据</td>
+          </tr>
+          <tr>
+            <td style="text-align:left;font-weight:600">Vec (bge-m3)</td>
+            <td>0.800</td>
+            <td>0.800</td>
+            <td>0.933</td>
+            <td class="best">★★★★</td>
+            <td>~50ms</td>
+            <td>Embedding 模型</td>
+          </tr>
+          <tr>
+            <td style="text-align:left;font-weight:600">WSF</td>
+            <td class="best">0.900</td>
+            <td class="best">1.000</td>
+            <td class="best">1.000</td>
+            <td class="best">★★★★</td>
+            <td>~60ms</td>
+            <td>模型</td>
+          </tr>
+          <tr>
+            <td style="text-align:left;font-weight:600">RRF</td>
+            <td class="best">0.900</td>
+            <td>0.933</td>
+            <td>0.933</td>
+            <td>★★★★</td>
+            <td>~60ms</td>
+            <td>模型+KG</td>
+          </tr>
+          <tr style="background:rgba(74,222,128,0.05)">
+            <td style="text-align:left;font-weight:700;color:var(--green)">V9 最优 ⭐</td>
+            <td class="best" style="font-size:16px">0.907</td>
+            <td>0.933</td>
+            <td class="best">1.000</td>
+            <td class="best">★★★★★</td>
+            <td>~38s</td>
+            <td>模型×2</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 6: Heatmap ==================== -->
+<div class="slide" id="heatmap">
+<div class="slide-inner">
+  <h2>🔥 Per-Query 热力图</h2>
+  <p class="subtitle">15 条查询 × 6 种方法 · 每个查询的 MRR 表现</p>
+
+  <div class="card">
+    <div class="heatmap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;min-width:200px">查询</th>
+            <th>BM25</th>
+            <th>BM25+KG</th>
+            <th>Vec</th>
+            <th>WSF</th>
+            <th>RRF</th>
+            <th>V9</th>
+            <th style="min-width:200px">说明</th>
+          </tr>
+        </thead>
+        <tbody id="heatmapBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <div class="card-title"><span class="icon">🔍</span>弱查询分析</div>
+    <div class="grid grid-2">
+      <div style="background:rgba(74,222,128,0.05);border:1px solid rgba(74,222,128,0.3);border-radius:12px;padding:16px">
+        <div style="font-weight:700;color:var(--green);margin-bottom:8px">✅ Q9（闪电）— 已修复</div>
+        <div style="font-size:13px;color:var(--muted)">
+          <strong>问题：</strong>"形成" vs "放电" 语义鸿沟<br>
+          <strong>方案：</strong>查询改写 + 中文 Reranker<br>
+          <strong>效果：</strong>MRR 从 0.500 → <span style="color:var(--green);font-weight:700">1.000</span>
+        </div>
+      </div>
+      <div style="background:rgba(250,204,21,0.05);border:1px solid rgba(250,204,21,0.3);border-radius:12px;padding:16px">
+        <div style="font-weight:700;color:var(--yellow);margin-bottom:8px">⚠️ Q13（潜水艇）— 仍为瓶颈</div>
+        <div style="font-size:13px;color:var(--muted)">
+          <strong>问题：</strong>动态过程 vs 静态原理<br>
+          <strong>方案：</strong>改写 + Reranker 仍不足<br>
+          <strong>效果：</strong>MRR 从 0.000 → <span style="color:var(--yellow);font-weight:700">0.100</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 7: Solutions ==================== -->
+<div class="slide" id="solutions">
+<div class="slide-inner">
+  <h2>🏗️ 推荐生产方案</h2>
+  <p class="subtitle">根据场景选择最适合的检索方案</p>
+
+  <div class="grid grid-3">
+    <!-- Solution 1: WSF -->
+    <div class="solution-card" style="border-color:var(--accent)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(56,189,248,0.15)">⚡</div>
+        <div>
+          <div class="sol-title">方案一：WSF</div>
+          <div style="font-size:12px;color:var(--green)">轻量级 · 最推荐</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.900</div>
+      <div style="margin-top:16px;font-size:13px">
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>场景：</strong>无 KG，需要快速响应
+        </div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>延迟：</strong>~60ms
+        </div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>参数：</strong>Vec_w=0.5, 候选集=50
+        </div>
+        <div style="padding:8px 0">
+          <strong>优势：</strong>Hit@3=1.000, Hit@5=1.000
+        </div>
+      </div>
+    </div>
+
+    <!-- Solution 2: RRF -->
+    <div class="solution-card" style="border-color:var(--purple)">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(167,139,250,0.15)">📊</div>
+        <div>
+          <div class="sol-title">方案二：RRF</div>
+          <div style="font-size:12px;color:var(--purple)">含 KG · 鲁棒性强</div>
+        </div>
+      </div>
+      <div class="sol-mrr">0.900</div>
+      <div style="margin-top:16px;font-size:13px">
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>场景：</strong>有 KG，需要稳定表现
+        </div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>延迟：</strong>~60ms
+        </div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>参数：</strong>k=30, Vec_w=1.5
+        </div>
+        <div style="padding:8px 0">
+          <strong>优势：</strong>参数区间宽泛，不易过拟合
+        </div>
+      </div>
+    </div>
+
+    <!-- Solution 3: V9 -->
+    <div class="solution-card" style="border-color:var(--green);border-width:3px">
+      <div class="sol-header">
+        <div class="sol-icon" style="background:rgba(74,222,128,0.15)">🚀</div>
+        <div>
+          <div class="sol-title">方案三：V9 最优</div>
+          <div style="font-size:12px;color:var(--green)">精度优先 · 新纪录</div>
+        </div>
+      </div>
+      <div class="sol-mrr" style="color:var(--green)">0.907</div>
+      <div style="margin-top:16px;font-size:13px">
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>场景：</strong>精度优先，可接受较高延迟
+        </div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>延迟：</strong>~38s（需 GPU 加速）
+        </div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <strong>参数：</strong>候选集=50, 中文 Reranker
+        </div>
+        <div style="padding:8px 0">
+          <strong>优势：</strong>Q9 完全修复，整体最优
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture Comparison -->
+  <div class="card" style="margin-top:24px">
+    <div class="card-title"><span class="icon">🔄</span>架构选择决策树</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;padding:20px">
+      <div style="background:var(--card);border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;min-width:160px">
+        <div style="font-size:14px;font-weight:600">用户查询</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">自然语言问题</div>
+      </div>
+      <div style="color:var(--accent);font-size:20px">→</div>
+      <div style="background:rgba(56,189,248,0.1);border:2px solid var(--accent);border-radius:12px;padding:16px;text-align:center;min-width:200px">
+        <div style="font-size:14px;font-weight:600">是否有 KG？</div>
+        <div style="display:flex;gap:12px;margin-top:8px;justify-content:center">
+          <span class="badge badge-green">是 → RRF</span>
+          <span class="badge badge-blue">否 → WSF</span>
+        </div>
+      </div>
+      <div style="color:var(--accent);font-size:20px">→</div>
+      <div style="background:rgba(74,222,128,0.1);border:2px solid var(--green);border-radius:12px;padding:16px;text-align:center;min-width:200px">
+        <div style="font-size:14px;font-weight:600">是否需要最高精度？</div>
+        <div style="display:flex;gap:12px;margin-top:8px;justify-content:center">
+          <span class="badge badge-green">是 → V9 Reranker</span>
+          <span class="badge badge-blue">否 → WSF/RRF</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== SLIDE 8: Future ==================== -->
+<div class="slide" id="future">
+<div class="slide-inner">
+  <h2>🔮 未来方向</h2>
+  <p class="subtitle">突破当前天花板的 5 个方向</p>
+
+  <div class="grid grid-2">
+    <div class="card" style="border-left:4px solid var(--accent)">
+      <div class="card-title"><span class="icon">🤖</span>LLM 查询改写</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:12px">
+        用大模型（GPT-4、Claude）智能改写弱查询
+      </div>
+      <div style="background:rgba(56,189,248,0.1);border-radius:8px;padding:12px;font-size:13px">
+        <strong>当前：</strong>规则改写（手动编写关键词）<br>
+        <strong>未来：</strong>LLM 自动理解意图，生成多种表达<br>
+        <strong>目标：</strong>突破 Q13(潜水艇) 瓶颈
+      </div>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--green)">
+      <div class="card-title"><span class="icon">⚡</span>模型量化加速</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:12px">
+        解决 Reranker 推理速度瓶颈（~1.3 pairs/s）
+      </div>
+      <div style="background:rgba(74,222,128,0.1);border-radius:8px;padding:12px;font-size:13px">
+        <strong>方案 1：</strong>INT8/INT4 量化<br>
+        <strong>方案 2：</strong>ONNX Runtime 优化<br>
+        <strong>方案 3：</strong>GPU 服务器部署
+      </div>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--purple)">
+      <div class="card-title"><span class="icon">🔍</span>更大候选集 + 更强 Reranker</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:12px">
+        两阶段检索架构进一步扩展
+      </div>
+      <div style="background:rgba(167,139,250,0.1);border-radius:8px;padding:12px;font-size:13px">
+        <strong>Stage1：</strong>多路召回 100-200 候选<br>
+        <strong>Stage2：</strong>bge-reranker-v2-m3-large<br>
+        <strong>预期：</strong>MRR 可能突破 0.940
+      </div>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--pink)">
+      <div class="card-title"><span class="icon">🧠</span>更强 Embedding 模型</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:12px">
+        测试更大规模的多语言模型
+      </div>
+      <div style="background:rgba(244,114,182,0.1);border-radius:8px;padding:12px;font-size:13px">
+        <strong>候选：</strong>multilingual-e5-large (560M)<br>
+        <strong>候选：</strong>gte-Qwen2-7B-instruct (7B)<br>
+        <strong>目标：</strong>提升基础向量检索质量
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card" style="margin-top:24px;border-color:var(--accent);background:rgba(56,189,248,0.05)">
+    <div class="card-title"><span class="icon">📊</span>实验总结</div>
+    <div class="grid grid-4">
+      <div style="text-align:center;padding:16px">
+        <div style="font-size:36px;font-weight:800;color:var(--accent)">9</div>
+        <div style="font-size:13px;color:var(--muted)">实验轮次</div>
+      </div>
+      <div style="text-align:center;padding:16px">
+        <div style="font-size:36px;font-weight:800;color:var(--green)">166+</div>
+        <div style="font-size:13px;color:var(--muted)">配置组合</div>
+      </div>
+      <div style="text-align:center;padding:16px">
+        <div style="font-size:36px;font-weight:800;color:var(--purple)">0.907</div>
+        <div style="font-size:13px;color:var(--muted)">最优 MRR</div>
+      </div>
+      <div style="text-align:center;padding:16px">
+        <div style="font-size:36px;font-weight:800;color:var(--yellow)">0.940</div>
+        <div style="font-size:13px;color:var(--muted)">理论上限</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const heatmapData = [
+  {q:"Q0 浮力在潜水艇中的应用",bm25:0.5,kg:1.0,vec:0.333,wsf:0.5,rrf:1.0,v9:0.5,note:"Vec弱→WSF修复"},
+  {q:"Q1 光的本质是什么",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q2 牛顿对光学的贡献",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q3 自然光源有哪些",bm25:0.2,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"BM25弱→融合修复"},
+  {q:"Q4 激光的特点和应用",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q5 欧几里德光学研究",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q6 眼睛的视觉原理",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q7 光速是多少",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q8 密度计的工作原理",bm25:0.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"BM25完全失败"},
+  {q:"Q9 闪电是怎么形成的",bm25:0.333,kg:0.0,vec:0.25,wsf:0.5,rrf:0.0,v9:1.0,note:"⚠️ V9完全修复！"},
+  {q:"Q10 郑和宝船与航海技术",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"Vec+BM25互补"},
+  {q:"Q11 反射和折射的区别",bm25:1.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:1.0,note:"全部满分"},
+  {q:"Q12 人工光源的发展历史",bm25:0.0,kg:1.0,vec:1.0,wsf:1.0,rrf:1.0,v9:0.5,note:"BM25失败→融合修复"},
+  {q:"Q13 潜水艇如何上浮和下潜",bm25:1.0,kg:0.0,vec:0.0,wsf:0.5,rrf:0.0,v9:0.1,note:"⚠️ 仍为瓶颈"},
+  {q:"Q14 光的颜色是怎么产生的",bm25:1.0,kg:1.0,vec:0.5,wsf:1.0,rrf:1.0,v9:1.0,note:"Vec弱→融合修复"},
+];
+
+const mrrEvolution = [
+  {v:"V1",mrr:0.889,groups:12},
+  {v:"V2",mrr:0.889,groups:39},
+  {v:"V3",mrr:0.889,groups:38},
+  {v:"V4",mrr:0.900,groups:40},
+  {v:"V5",mrr:0.900,groups:24},
+  {v:"V6",mrr:0.900,groups:22},
+  {v:"V7",mrr:0.900,groups:27},
+  {v:"V8",mrr:0.747,groups:22},
+  {v:"V9",mrr:0.907,groups:11},
+];
+
+const baselines = [
+  {name:"BM25",mrr:0.769,color:"#f87171"},
+  {name:"BM25+KG",mrr:0.867,color:"#fb923c"},
+  {name:"Vec",mrr:0.800,color:"#a78bfa"},
+  {name:"WSF",mrr:0.900,color:"#38bdf8"},
+  {name:"RRF",mrr:0.900,color:"#38bdf8"},
+  {name:"V9最优",mrr:0.907,color:"#4ade80"},
+];
+
+// ==================== RENDER FUNCTIONS ====================
+function getCellClass(val) {
+  if (val >= 1.0) return "cell-100";
+  if (val >= 0.5) return "cell-50";
+  if (val >= 0.33) return "cell-33";
+  if (val >= 0.25) return "cell-25";
+  if (val > 0) return "cell-25";
+  return "cell-0";
+}
+
+function renderHeatmap() {
+  const tbody = document.getElementById("heatmapBody");
+  let html = "";
+  heatmapData.forEach(row => {
+    html += `<tr>
+      <td class="query-cell">${row.q}</td>
+      <td class="${getCellClass(row.bm25)}">${row.bm25.toFixed(3)}</td>
+      <td class="${getCellClass(row.kg)}">${row.kg.toFixed(3)}</td>
+      <td class="${getCellClass(row.vec)}">${row.vec.toFixed(3)}</td>
+      <td class="${getCellClass(row.wsf)}">${row.wsf.toFixed(3)}</td>
+      <td class="${getCellClass(row.rrf)}">${row.rrf.toFixed(3)}</td>
+      <td class="${getCellClass(row.v9)}" style="font-weight:700">${row.v9.toFixed(3)}</td>
+      <td style="font-size:12px;color:var(--muted);text-align:left">${row.note}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function renderMRRChart() {
+  const container = document.getElementById("mrrChart");
+  const w = container.clientWidth;
+  const h = 300;
+  const pad = {top:40,right:30,bottom:40,left:60};
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+
+  const minMRR = 0.7;
+  const maxMRR = 0.95;
+  const yScale = (v) => pad.top + chartH - ((v - minMRR) / (maxMRR - minMRR)) * chartH;
+  const xScale = (i) => pad.left + (i / (mrrEvolution.length - 1)) * chartW;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Grid lines
+  for (let v = 0.7; v <= 0.95; v += 0.05) {
+    const y = yScale(v);
+    svg += `<line x1="${pad.left}" y1="${y}" x2="${w-pad.right}" y2="${y}" stroke="#334155" stroke-dasharray="4"/>`;
+    svg += `<text x="${pad.left-10}" y="${y+4}" text-anchor="end" fill="#94a3b8" font-size="11">${v.toFixed(2)}</text>`;
+  }
+
+  // Baselines
+  const bm25y = yScale(0.769);
+  svg += `<line x1="${pad.left}" y1="${bm25y}" x2="${w-pad.right}" y2="${bm25y}" stroke="#f87171" stroke-dasharray="4" stroke-width="1.5"/>`;
+  svg += `<text x="${w-pad.right+5}" y="${bm25y+4}" fill="#f87171" font-size="10">BM25</text>`;
+
+  const kgY = yScale(0.867);
+  svg += `<line x1="${pad.left}" y1="${kgY}" x2="${w-pad.right}" y2="${kgY}" stroke="#fb923c" stroke-dasharray="4" stroke-width="1.5"/>`;
+  svg += `<text x="${w-pad.right+5}" y="${kgY+4}" fill="#fb923c" font-size="10">BM25+KG</text>`;
+
+  // Line path
+  let pathD = "";
+  mrrEvolution.forEach((d, i) => {
+    const x = xScale(i);
+    const y = yScale(d.mrr);
+    pathD += (i === 0 ? "M" : "L") + `${x},${y}`;
+  });
+  svg += `<path d="${pathD}" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>`;
+
+  // Points and labels
+  mrrEvolution.forEach((d, i) => {
+    const x = xScale(i);
+    const y = yScale(d.mrr);
+    const isHighlight = d.v === "V4" || d.v === "V9";
+    const color = d.v === "V8" ? "#f87171" : (isHighlight ? "#4ade80" : "#38bdf8");
+    const r = isHighlight ? 7 : 5;
+
+    svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" stroke="#0f172a" stroke-width="2"/>`;
+    svg += `<text x="${x}" y="${y-14}" text-anchor="middle" fill="${color}" font-size="12" font-weight="700">${d.mrr.toFixed(3)}</text>`;
+    svg += `<text x="${x}" y="${h-pad.bottom+20}" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="600">${d.v}</text>`;
+    svg += `<text x="${x}" y="${h-pad.bottom+34}" text-anchor="middle" fill="#64748b" font-size="10">${d.groups}组</text>`;
+  });
+
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+function renderBaselineChart() {
+  const container = document.getElementById("baselineChart");
+  const maxMRR = 1.0;
+  let html = `<div class="bar-chart">`;
+  baselines.forEach(d => {
+    const h = (d.mrr / maxMRR) * 100;
+    html += `<div class="bar-group">
+      <div class="bar" style="height:${h}%;background:${d.color}">
+        <div class="bar-label" style="color:${d.color}">${d.mrr.toFixed(3)}</div>
+      </div>
+      <div class="group-label">${d.name}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+// ==================== INIT ====================
+function init() {
+  renderHeatmap();
+  renderMRRChart();
+  renderBaselineChart();
+
+  // Slide dots
+  const slides = document.querySelectorAll('.slide');
+  const dotsContainer = document.getElementById('slideDots');
+  slides.forEach((slide, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'slide-dot' + (i === 0 ? ' active' : '');
+    dot.dataset.index = i;
+    dot.addEventListener('click', () => {
+      slide.scrollIntoView({behavior:'smooth'});
+    });
+    dotsContainer.appendChild(dot);
+  });
+
+  // Active dot tracking
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = Array.from(slides).indexOf(entry.target);
+        document.querySelectorAll('.slide-dot').forEach((d,i) => {
+          d.classList.toggle('active', i === idx);
+        });
+        document.querySelectorAll('nav a').forEach((a,i) => {
+          a.classList.toggle('active', i === idx);
+        });
+      }
+    });
+  }, {threshold:0.3});
+  slides.forEach(s => observer.observe(s));
+}
+
+window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('resize', () => {
+  renderMRRChart();
+  renderBaselineChart();
+});
+</script>
+</body>
+</html>

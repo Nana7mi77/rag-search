@@ -1,0 +1,41 @@
+你是一名后端研发，工作在 rag-search 项目的 workspaces/be-dev 工作区。
+
+## 目标
+修改搜索API，返回前端卡片所需的数据结构。
+
+## 当前状态
+- 搜索API: `rag_search/web.py` 中的 `/api/search` 端点
+- 搜索引擎: `rag_search/rag.py` 中的 `RagSearchEngine.search()` 返回 `RagResult`
+- 搜索结果: `rag_search/index.py` 中的 `SearchHit` dataclass
+- 数据字段: name(纪录片文件名如"BBC.Light.Fantastic.2004.01.srt"), time(时间范围如"00:01:25,318 --> 00:02:23,039"), subtitle(字幕文本)
+
+## 约束
+1. 不改变现有 `/api/search` 和 `/api/ask` 的核心逻辑
+2. 在 SearchHit 的 to_dict 输出中新增以下字段:
+   - `doc_name`: 从 title/name 解析的纪录片名（去掉.srt后缀，去掉点号分隔改成空格）
+   - `start_seconds`: 从 time 字段解析的起始秒数（"00:01:25,318" → 85.318）
+   - `bilibili_url`: B站视频链接（格式: `https://www.bilibili.com/video/{bvid}?t={start_seconds}`）
+   - `thumbnail_placeholder`: 设为 True（表示需要前端生成占位截图）
+3. 在 `rag_search/` 目录下新建 `bilibili_map.py`，包含一个纪录片名到BVID的映射字典
+   - 对于 demo，使用占位 BVID（如 "BV1xx411c7mD"）
+   - 提供一个 `get_bvid(title: str) -> str` 函数
+4. 修改 `SearchHit` dataclass，新增 `doc_name`, `start_seconds`, `bilibili_url` 字段
+5. 在 `rag.py` 的 `search()` 方法中，构造 SearchHit 时填充新字段
+
+## 必读文件
+- `rag_search/web.py` - 现有Web服务和API
+- `rag_search/rag.py` - 搜索引擎
+- `rag_search/index.py` - Document/SearchHit 定义
+- `data/local_subtitles.csv` - 数据样例（只读，不改）
+
+## 输出产物
+1. `rag_search/bilibili_map.py` - BVID映射
+2. `rag_search/index.py` - SearchHit 新增字段
+3. `rag_search/rag.py` - 构造 SearchHit 时填充新字段
+
+## 完成信号
+- 运行 `python3 -c "from rag_search.index import SearchHit; h = SearchHit(0, 1.0, 'BBC.Light.Fantastic.2004.01.srt', '00:01:25,318 --> 00:02:23,039', 'test', 'test'); print(h)"` 不报错
+- SearchHit 输出包含 doc_name, start_seconds, bilibili_url 字段
+
+## 现有依赖
+先安装: `pip install -e .` 或确认 rag_search 包可导入

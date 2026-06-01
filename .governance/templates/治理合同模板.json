@@ -1,0 +1,21 @@
+{
+  "req_id": "",
+  "task_type": "Patch|Extend|New|Replace|Delete|Migrate",
+  "target": "",
+  "non_target": "",
+  "risk_level": "low|medium|high",
+  "candidate_modules": [],
+  "candidate_files": [],
+  "candidate_symbols": [],
+  "existing_implementation": "",
+  "reuse_strategy": "reuse|extend|new",
+  "needs_ai_review": false,
+  "needs_arch_review": false,
+  "frontend_scope": "",
+  "backend_scope": "",
+  "algo_scope": "",
+  "acceptance_criteria": [],
+  "regression_requirements": [],
+  "authoritative_source": "",
+  "notes": ""
+}

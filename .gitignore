@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 *.log
 .env
+*.egg-info/
+workspaces/
+tasks/*/logs/
 
 # Local corpora and generated indexes
 data/local_*.csv

@@ -1,0 +1,26 @@
+你是验证扫描成员，工作在 rag-search 项目的主工作区。
+
+## 目标
+验证 demo 功能端到端可用。
+
+## 验证步骤
+1. 启动服务: `cd /Users/ouakira/rag-search && python3 -m rag_search serve --port 7860`
+2. 访问 http://127.0.0.1:7860
+3. 输入查询 "光的折射"
+4. 检查:
+   - 返回10条结果
+   - 结果以卡片形式展示
+   - 每张卡片有: 纪录片名、时间戳、字幕文本、占位截图
+   - 点击卡片跳转B站链接（新窗口）
+5. 运行 `python3 -c "from rag_search.index import SearchHit; print('SearchHit OK')"` 验证代码可导入
+6. 记录验证结果
+
+## 输出产物
+在 `tasks/r00-demo-cards/` 下创建 `verify-report.md`，包含:
+- 验证通过/失败
+- 截图证据（如果有）
+- 残余风险
+
+## 完成信号
+- 验证报告已写入
+- 所有检查项通过或明确记录失败原因
