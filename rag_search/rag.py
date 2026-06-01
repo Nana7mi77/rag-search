@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from .bilibili_map import build_bilibili_url, get_bvid, parse_doc_name, parse_start_seconds
 from .graph import GraphExpansion, LocalKnowledgeGraph
 from .index import BM25Index, SearchHit, load_documents_csv
 from .llm import LLMConfig, llm_answer
@@ -208,6 +209,8 @@ class HybridRagSearchEngine(RagSearchEngine):
                 if 0 <= doc_id < len(self.index.documents):
                     doc = self.index.documents[doc_id]
                     snippet = best_snippet(doc.text, query_text)
+                    doc_name = parse_doc_name(doc.title)
+                    start_seconds = parse_start_seconds(doc.time)
                     hits.append(SearchHit(
                         doc_id=doc_id,
                         score=score,
@@ -215,6 +218,9 @@ class HybridRagSearchEngine(RagSearchEngine):
                         time=doc.time,
                         text=doc.text,
                         snippet=snippet,
+                        doc_name=doc_name,
+                        start_seconds=start_seconds,
+                        bilibili_url=build_bilibili_url(get_bvid(doc_name), start_seconds),
                     ))
             search_mode = "hybrid"
         else:

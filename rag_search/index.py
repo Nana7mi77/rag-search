@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from .bilibili_map import build_bilibili_url, get_bvid, parse_doc_name, parse_start_seconds
 from .text import best_snippet, normalize_text, tokenize
 
 
@@ -31,6 +32,10 @@ class SearchHit:
     time: str
     text: str
     snippet: str
+    doc_name: str = ""
+    start_seconds: float = 0.0
+    bilibili_url: str = ""
+    thumbnail_placeholder: bool = True
 
 
 def _pick_column(row: Dict[str, str], candidates: Iterable[str], explicit: Optional[str] = None) -> Optional[str]:
@@ -139,6 +144,8 @@ class BM25Index:
                 denom = freq + k1 * (1 - b + b * doc_len / max(self.avg_doc_len, 1))
                 score += self.idf(term) * (freq * (k1 + 1) / denom) * min(query_weight, 2)
             if score > 0:
+                doc_name = parse_doc_name(document.title)
+                start_seconds = parse_start_seconds(document.time)
                 scored.append(
                     SearchHit(
                         doc_id=document.doc_id,
@@ -147,6 +154,9 @@ class BM25Index:
                         time=document.time,
                         text=document.text,
                         snippet=best_snippet(document.text, query_text, terms),
+                        doc_name=doc_name,
+                        start_seconds=start_seconds,
+                        bilibili_url=build_bilibili_url(get_bvid(doc_name), start_seconds),
                     )
                 )
 
