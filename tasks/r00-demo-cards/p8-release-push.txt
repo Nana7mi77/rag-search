@@ -1,0 +1,25 @@
+你是 release-manager，负责最终提交和推送。
+
+## 目标
+将所有未提交的改动提交到main分支，然后push到origin。
+
+## 执行步骤
+
+1. cd到项目根目录 /Users/ouakira/rag-search
+
+2. 执行 git add 添加所有改动文件：
+   git add rag_search/web.py "governance/tables/需求表.csv" "governance/tables/项目日志表.csv" tasks/
+
+3. 执行 git commit：
+   git commit -m "fix: JS语法修复 + 项目日志更新 + 任务包归档"
+
+4. 执行 git push origin main
+
+5. 执行 git log --oneline -3 确认结果
+
+## 完成信号
+输出 "TASK_DONE" 并附上 git log 最后3行。
+
+## 约束
+- 只在 /Users/ouakira/rag-search 目录执行
+- 不修改任何代码文件，只做提交和推送

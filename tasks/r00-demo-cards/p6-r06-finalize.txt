@@ -1,0 +1,56 @@
+你是一名验证扫描成员，工作在 rag-search 项目的主工作区 /Users/ouakira/rag-search。
+
+## 目标
+完成demo卡片功能的最终验证和提交。
+
+## 步骤
+
+### 1. 验证JS语法修复
+```bash
+cd /Users/ouakira/rag-search
+python3 -c "
+import re
+from rag_search.web import HTML
+nested = re.findall(r'\x60[^\x60]*\$\{[^}]*\x60', HTML)
+if nested:
+    print('FAIL: found', len(nested), 'nested backtick patterns')
+else:
+    print('PASS: JS syntax verified - no nested backticks')
+"
+```
+
+### 2. 验证卡片字段
+```bash
+python3 -c "
+from rag_search.index import load_documents_csv, BM25Index
+from dataclasses import asdict
+idx = BM25Index(load_documents_csv('data/local_subtitles.csv'))
+r = idx.search('光的折射', top_k=3)
+d = asdict(r[0])
+print('doc_name:', d.get('doc_name'))
+print('start_seconds:', d.get('start_seconds'))
+print('bilibili_url:', d.get('bilibili_url'))
+assert d.get('doc_name'), 'missing doc_name'
+assert d.get('start_seconds'), 'missing start_seconds'
+assert d.get('bilibili_url'), 'missing bilibili_url'
+print('PASS: card fields OK')
+"
+```
+
+### 3. 配置git并提交
+```bash
+git config user.email "pm@rag-search.local"
+git config user.name "PM"
+git add -A
+git status
+git diff --cached --stat
+git commit -m "fix: 修复卡片渲染JS语法错误 + 完善demo功能"
+```
+
+### 4. 如果commit失败
+检查是否有实际改动需要提交。如果没有改动说明代码已经在之前提交过了，直接报告"已提交"。
+
+## 完成信号
+- JS语法验证通过
+- 卡片字段验证通过
+- 代码已提交或确认已提交

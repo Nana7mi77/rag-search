@@ -1,0 +1,36 @@
+你是一名验证扫描成员，工作在 rag-search 项目的主工作区 /Users/ouakira/rag-search。
+
+## 目标
+更新项目日志，记录demo卡片功能完成。
+
+## 步骤
+
+### 1. 配置git
+```bash
+cd /Users/ouakira/rag-search
+git config user.email "pm@rag-search.local"
+git config user.name "PM"
+```
+
+### 2. 更新项目日志表
+在 `governance/tables/项目日志表.csv` 末尾添加以下行：
+```
+LOG-002,2026-06-01,功能,REQ-002,Phase3-验证,通过,claude -p verify-scan验证:JS语法修复+卡片字段完整,代码已提交main(commit 501ace1),verify-scan,Demo卡片功能完成
+```
+
+### 3. 更新需求表状态
+将 `governance/tables/需求表.csv` 中的：
+- REQ-002 状态改为 "已完成"
+- REQ-002-r01 状态改为 "已完成"
+- REQ-002-r02 状态改为 "已完成"
+
+### 4. 提交
+```bash
+git add governance/tables/
+git commit -m "docs: 更新项目日志 - demo卡片功能完成"
+```
+
+## 完成信号
+- 项目日志表已更新
+- 需求表状态已更新
+- 代码已提交

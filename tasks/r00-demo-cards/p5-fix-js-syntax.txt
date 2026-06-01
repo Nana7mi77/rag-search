@@ -1,0 +1,28 @@
+你是一名验证扫描成员，工作在 rag-search 项目的主工作区 /Users/ouakira/rag-search。
+
+## 问题
+`rag_search/web.py` 中的 `renderResult` 函数有 JS 语法错误：嵌套模板字面量中的反引号导致 `SyntaxError: Invalid or unexpected token`。
+
+## 修复要求
+1. 打开 `rag_search/web.py`，找到 `renderResult` 函数
+2. 定位到 `onclick` 和 `title` 属性中使用模板字面量的地方
+3. 把嵌套的模板字面量替换为字符串拼接方式
+4. 例如：把 `` onclick="${bilibiliUrl ? `window.open('${bilibiliUrl}', '_blank')` : ""}" `` 改为 `onclick="${onclickAttr}"`，其中 `onclickAttr` 在前面用字符串拼接定义
+
+## 修复后验证
+```bash
+cd /Users/ouakira/rag-search
+python3 -c "
+import re
+from rag_search.web import HTML
+# 检查是否有嵌套反引号
+if '\`' in HTML and HTML.count('\`') > 2:
+    print('WARNING: 可能仍有嵌套反引号')
+else:
+    print('JS语法检查通过')
+"
+```
+
+## 完成信号
+- JS语法错误已修复
+- 代码已提交: `git add rag_search/web.py && git commit -m "fix: 修复卡片渲染JS语法错误"`

@@ -356,9 +356,11 @@ HTML = """<!doctype html>
         const score = Number(hit.score || 0).toFixed(3);
         const bilibiliUrl = (hit.bilibili_url || "").replace(/'/g, "\\'");
         const thumbText = docName.length > 14 ? docName.slice(0, 14) + "..." : docName;
+        const onclickAttr = bilibiliUrl ? "window.open('" + bilibiliUrl + "', '_blank')" : "";
+        const titleAttr = bilibiliUrl ? "点击跳转B站观看" : "";
 
         return `
-        <article class="card" onclick="${bilibiliUrl ? `window.open('${bilibiliUrl}', '_blank')` : ""}" title="${bilibiliUrl ? "点击跳转B站观看" : ""}">
+        <article class="card" onclick="${onclickAttr}" title="${titleAttr}">
           <div class="card-thumb">
             <svg viewBox="0 0 16 9" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
               <defs>
