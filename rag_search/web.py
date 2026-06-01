@@ -156,44 +156,86 @@ HTML = """<!doctype html>
     }
     .results {
       display: grid;
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
     }
-    .hit {
-      padding: 14px 16px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
+    .card {
       background: var(--panel);
-    }
-    .hit-head {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
       display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: baseline;
-      margin-bottom: 8px;
+      flex-direction: column;
     }
-    .title {
+    .card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+    .card-thumb {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: linear-gradient(135deg, #1a3a4a 0%, #315f72 50%, #4a2c5e 100%);
+      overflow: hidden;
+    }
+    .card-thumb svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .card-score {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 12px;
+      padding: 3px 9px;
+      border-radius: 10px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .card-body {
+      padding: 12px 14px 14px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-title {
       font-size: 15px;
       font-weight: 700;
-      overflow-wrap: anywhere;
+      margin: 0 0 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
     }
-    .score {
-      flex: 0 0 auto;
-      color: var(--muted);
+    .card-time {
       font-size: 12px;
-    }
-    .time {
       color: var(--accent);
-      font-size: 13px;
-      margin-bottom: 8px;
+      margin: 0 0 8px;
     }
-    .snippet {
-      line-height: 1.7;
-      font-size: 15px;
-      overflow-wrap: anywhere;
+    .card-snippet {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 0;
+      flex: 1;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .error {
       color: var(--danger);
       border-left-color: var(--danger);
+    }
+    @media (max-width: 1020px) {
+      .results {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      }
     }
     @media (max-width: 820px) {
       .shell {
@@ -206,6 +248,11 @@ HTML = """<!doctype html>
         height: auto;
       }
       .controls {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 520px) {
+      .results {
         grid-template-columns: 1fr;
       }
     }
@@ -268,6 +315,14 @@ HTML = """<!doctype html>
       }[ch]));
     }
 
+    function formatTime(seconds) {
+      if (seconds == null || isNaN(seconds)) return "";
+      const s = Number(seconds);
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return m + ":" + String(sec).padStart(2, "0");
+    }
+
     function setBusy(busy) {
       state.search.disabled = busy;
       state.ask.disabled = busy;
@@ -293,16 +348,40 @@ HTML = """<!doctype html>
         ? `图谱补强：${result.matched_terms.join("、")} | 模式：${modeLabel}`
         : `模式：${modeLabel}`;
       state.message.textContent = hits.length ? `找到 ${hits.length} 条证据` : "没有找到匹配证据";
-      state.results.innerHTML = hits.map((hit, index) => `
-        <article class="hit">
-          <div class="hit-head">
-            <div class="title">${index + 1}. ${escapeHtml(hit.title || `doc-${hit.doc_id}`)}</div>
-            <div class="score">${Number(hit.score || 0).toFixed(3)}</div>
+      state.results.innerHTML = hits.map((hit, index) => {
+        const docName = escapeHtml(hit.doc_name || hit.title || `doc-${hit.doc_id}`);
+        const timeLabel = escapeHtml(hit.time || "");
+        const startTime = formatTime(hit.start_seconds);
+        const snippet = escapeHtml(hit.snippet || hit.text || "");
+        const score = Number(hit.score || 0).toFixed(3);
+        const bilibiliUrl = (hit.bilibili_url || "").replace(/'/g, "\\'");
+        const thumbText = docName.length > 14 ? docName.slice(0, 14) + "..." : docName;
+
+        return `
+        <article class="card" onclick="${bilibiliUrl ? `window.open('${bilibiliUrl}', '_blank')` : ""}" title="${bilibiliUrl ? "点击跳转B站观看" : ""}">
+          <div class="card-thumb">
+            <svg viewBox="0 0 16 9" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="tg${index}" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#1a3a4a"/>
+                  <stop offset="50%" stop-color="#315f72"/>
+                  <stop offset="100%" stop-color="#4a2c5e"/>
+                </linearGradient>
+              </defs>
+              <rect width="16" height="9" fill="url(#tg${index})"/>
+              <text x="8" y="3.8" text-anchor="middle" fill="rgba(255,255,255,0.88)" font-size="1.2" font-weight="bold" font-family="Microsoft YaHei, sans-serif">${thumbText}</text>
+              <text x="8" y="5.8" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="0.75" font-family="Microsoft YaHei, sans-serif">${timeLabel}</text>
+              <polygon points="7,3.6 7,5.4 9,4.5" fill="rgba(255,255,255,0.45)"/>
+            </svg>
+            <span class="card-score">${score}</span>
           </div>
-          <div class="time">${escapeHtml(hit.time || "")}</div>
-          <div class="snippet">${escapeHtml(hit.snippet || hit.text || "")}</div>
-        </article>
-      `).join("");
+          <div class="card-body">
+            <h3 class="card-title" title="${escapeHtml(hit.doc_name || hit.title || "")}">${docName}</h3>
+            <p class="card-time">${startTime ? "🕐 " + startTime : ""}</p>
+            <p class="card-snippet">${snippet}</p>
+          </div>
+        </article>`;
+      }).join("");
     }
 
     async function run(mode) {
